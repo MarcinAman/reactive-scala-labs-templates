@@ -1,7 +1,8 @@
 package EShop.lab2
 
+import EShop.lab2.Checkout._
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
-import akka.event.Logging
+import akka.event.{Logging, LoggingReceive}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -30,6 +31,7 @@ object Checkout {
 }
 
 class Checkout extends Actor {
+  import context._
 
   private val scheduler = context.system.scheduler
   private val log       = Logging(context.system, this)
@@ -37,16 +39,42 @@ class Checkout extends Actor {
   val checkoutTimerDuration = 1 seconds
   val paymentTimerDuration  = 1 seconds
 
-  def receive: Receive = ???
+  def receive: Receive = LoggingReceive.withLabel("receive") {
+    case StartCheckout =>
+      val timer = schedule(checkoutTimerDuration, ExpireCheckout)
+      become(selectingDelivery(timer))
+  }
 
-  def selectingDelivery(timer: Cancellable): Receive = ???
+  def selectingDelivery(timer: Cancellable): Receive = LoggingReceive.withLabel("selectingDelivery") {
+    case SelectDeliveryMethod(_)         => become(selectingPaymentMethod(timer))
+    case CancelCheckout | ExpireCheckout => become(cancelled)
+  }
 
-  def selectingPaymentMethod(timer: Cancellable): Receive = ???
+  def selectingPaymentMethod(timer: Cancellable): Receive = LoggingReceive.withLabel("selectingPaymentMethod") {
+    case SelectPayment(_) =>
+      timer.cancel()
+      val paymentTimer = schedule(paymentTimerDuration, ExpirePayment)
+      become(processingPayment(paymentTimer))
+    case CancelCheckout | ExpireCheckout => become(cancelled)
+  }
 
-  def processingPayment(timer: Cancellable): Receive = ???
+  def processingPayment(timer: Cancellable): Receive = LoggingReceive.withLabel("processingPayment") {
+    case ReceivePayment =>
+      timer.cancel()
+      become(closed)
+    case CancelCheckout | ExpirePayment | ExpireCheckout => become(cancelled)
+  }
 
-  def cancelled: Receive = ???
+  def cancelled: Receive = LoggingReceive.withLabel("cancelled") {
+    case e => log.error("Payment cancelled", e.toString)
+  }
 
-  def closed: Receive = ???
+  def closed: Receive = LoggingReceive.withLabel("closed") {
+    case e => log.error("Payment closed", e.toString)
+  }
 
+  private def schedule(time: FiniteDuration, message: Command): Cancellable =
+    scheduler.scheduleOnce(delay = time, receiver = self, message = ExpireCheckout)(
+      context.system.dispatcher
+    )
 }

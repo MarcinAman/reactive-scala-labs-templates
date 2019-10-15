@@ -18,6 +18,7 @@ object CartFSM {
 
 class CartFSM extends LoggingFSM[Status.Value, Cart] {
   import EShop.lab2.CartFSM.Status._
+  import EShop.lab2.CartActor._
 
   // useful for debugging, see: https://doc.akka.io/docs/akka/current/fsm.html#rolling-event-log
   override def logDepth = 12
@@ -27,15 +28,26 @@ class CartFSM extends LoggingFSM[Status.Value, Cart] {
   startWith(Empty, Cart.empty)
 
   when(Empty) {
-    ???
+    case Event(AddItem(item), _) =>
+      goto(NonEmpty) using Cart(item :: Nil)
   }
 
   when(NonEmpty, stateTimeout = cartTimerDuration) {
-    ???
+    case Event(RemoveItem(item), cart: Cart) if cart.hasOnyThisItem(item) =>
+      goto(Empty) using Cart.empty
+    case Event(RemoveItem(item), cart: Cart) if cart.contains(item) =>
+      stay using cart.removeItem(item)
+    case Event(AddItem(item), cart: Cart) =>
+      stay using cart.addItem(item)
+    case Event(StartCheckout, cart: Cart) =>
+      goto(InCheckout) using cart
+    case Event(ExpireCart | StateTimeout, _) =>
+      goto(Empty) using Cart.empty
   }
 
   when(InCheckout) {
-    ???
+    case Event(CancelCheckout, cart: Cart) => goto(NonEmpty) using cart
+    case Event(CloseCheckout, _)           => goto(Empty) using Cart.empty
   }
 
 }
