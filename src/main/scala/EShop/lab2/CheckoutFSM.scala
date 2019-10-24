@@ -14,10 +14,10 @@ object CheckoutFSM {
     val NotStarted, SelectingDelivery, SelectingPaymentMethod, Cancelled, ProcessingPayment, Closed = Value
   }
 
-  def props(cartActor: ActorRef) = Props(new CheckoutFSM)
+  def props(cartActor: ActorRef) = Props(new CheckoutFSM(cartActor))
 }
 
-class CheckoutFSM extends LoggingFSM[Status.Value, Data] {
+class CheckoutFSM(cartActor: ActorRef) extends LoggingFSM[Status.Value, Data] {
   import EShop.lab2.Checkout._
   import EShop.lab2.CheckoutFSM.Status._
 
@@ -52,7 +52,6 @@ class CheckoutFSM extends LoggingFSM[Status.Value, Data] {
 
   when(ProcessingPayment) {
     case Event(ReceivePayment, _) => goto(Closed)
-    //ExpireCheckout wg diagramu nie powinien tutaj byc handlowany?
     case Event(CancelCheckout | ExpirePayment | ExpireCheckout, _) => goto(Cancelled)
   }
 
