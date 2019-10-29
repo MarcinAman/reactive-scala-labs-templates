@@ -34,12 +34,13 @@ class CartActor extends Actor {
 
   def receive: Receive = empty
 
-  def empty: Receive = LoggingReceive {
+  def empty: Receive = LoggingReceive.withLabel("empty") {
     case AddItem(item) =>
       become(nonEmpty(Cart.empty.addItem(item), scheduleTimer))
+    case GetItems => sender ! Cart.empty
   }
 
-  def nonEmpty(cart: Cart, timer: Cancellable): Receive = LoggingReceive {
+  def nonEmpty(cart: Cart, timer: Cancellable): Receive = LoggingReceive.withLabel("nonEmpty") {
     case RemoveItem(item) if cart.hasOnyThisItem(item) =>
       timer.cancel()
       become(empty)
@@ -51,11 +52,15 @@ class CartActor extends Actor {
       become(nonEmpty(cart.addItem(item), scheduleTimer))
     case StartCheckout =>
       timer.cancel()
-      become(inCheckout(cart))
+      val checkout = context.actorOf(Checkout.props(self), "checkout")
+      checkout ! Checkout.StartCheckout
+      sender() ! CheckoutStarted(checkout)
+      context become inCheckout(cart)
     case ExpireCart => become(empty)
+    case GetItems   => sender ! cart
   }
 
-  def inCheckout(cart: Cart): Receive = LoggingReceive {
+  def inCheckout(cart: Cart): Receive = LoggingReceive.withLabel("inCheckout") {
     case CloseCheckout  => become(empty)
     case CancelCheckout => become(nonEmpty(cart, scheduleTimer))
   }
