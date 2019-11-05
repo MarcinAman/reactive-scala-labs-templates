@@ -60,7 +60,7 @@ class CartActor extends Actor {
       timer.cancel()
       val checkout = context.actorOf(Checkout.props(self), "checkout")
       checkout ! Checkout.StartCheckout
-      sender() ! CheckoutStarted(checkout)
+      sender() ! CheckoutStarted(checkout, cart)
       context become inCheckout(cart)
     case ExpireCart => become(empty)
     case GetItems   => sender ! cart
