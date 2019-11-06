@@ -10,7 +10,7 @@ import scala.concurrent.duration._
 
 class ProductCatalogRemoteTest extends AsyncFlatSpec with Matchers {
 
-  implicit val timeout: Timeout = 3.second
+  implicit val timeout: Timeout = 10.second
 
   "A remote Product Catalog" should "return search results" in {
     val config = ConfigFactory.load()
